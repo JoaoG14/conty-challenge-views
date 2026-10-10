@@ -118,15 +118,26 @@ export function classify(views: number[], repetitionRules: RepetitionRules = REP
   } else if (repetition?.match) {
     classification = "suspect";
     const detail = repetition.match === "strong"
-      ? "A regularidade e a duração atendem à regra de repetição forte, sem exigir salto ou queda."
-      : `O trecho também teve queda de ${percent(repetition.drop!)} nas 3 horas seguintes.`;
+      ? `O índice é no máximo ${number(repetitionRules.strong_index)} e a duração é de pelo menos ${repetitionRules.strong_hours} horas, atendendo à regra forte. Essa regra não exige salto ou queda.`
+      : `O índice é no máximo ${number(repetitionRules.with_drop_index)} e a duração é de pelo menos ${repetitionRules.with_drop_hours} horas. A queda nas 3 horas seguintes foi de ${percent(repetition.drop!)}, atingindo o mínimo de ${percent(RULES.drop)}.`;
     reason = `Das horas ${repetition.start_hour + 1} a ${repetition.end_hour + 1}, foram ${repetition.hours} horas com média de ${number(repetition.mean)} views, índice de variação ${number(repetition.variation_index)} e ${percent(repetition.share)} do total. ${detail}`;
   } else if (peak.missing_context) {
     classification = "inconclusive";
-    reason = "Há um pico alto e concentrado, mas faltam horas antes/depois ou a mediana anterior é zero. Não há contexto para completar a regra de pico.";
+    const missing: string[] = [];
+    if (peak.baseline === null) missing.push(`o histórico anterior contém ${peak.hour} das 5 horas necessárias`);
+    else if (peak.baseline === 0) missing.push("a mediana das 5 horas anteriores é zero, então não é possível calcular a razão entre o pico e essa mediana");
+    if (peak.following_mean === null) missing.push(`o contexto posterior contém ${views.length - peak.hour - 1} das 3 horas necessárias para medir a queda`);
+    reason = `Na hora ${peak.hour + 1}, o pico teve ${number(peak.views)} views e ${percent(peak.share)} do total. A regra de pico ficou incompleta: ${missing.join("; ")}.`;
   } else if (repetition && repetition.variation_index <= repetitionRules.with_drop_index) {
     classification = "inconclusive";
-    reason = `Há ${repetition.hours} horas regulares, com índice ${number(repetition.variation_index)}, mas sem duração e regularidade suficientes para a regra forte nem queda que complete a outra regra.`;
+    const strongMissing: string[] = [];
+    const withDropMissing: string[] = [];
+    if (repetition.hours < repetitionRules.strong_hours) strongMissing.push(`duração mínima de ${repetitionRules.strong_hours} horas`);
+    if (repetition.variation_index > repetitionRules.strong_index) strongMissing.push(`índice de no máximo ${number(repetitionRules.strong_index)}`);
+    if (repetition.hours < repetitionRules.with_drop_hours) withDropMissing.push(`duração mínima de ${repetitionRules.with_drop_hours} horas`);
+    if (repetition.drop === null) withDropMissing.push(`3 horas seguintes para medir a queda (há ${views.length - repetition.end_hour - 1})`);
+    else if (repetition.drop < RULES.drop) withDropMissing.push(`queda mínima de ${percent(RULES.drop)} (a queda medida foi de ${percent(repetition.drop)})`);
+    reason = `Das horas ${repetition.start_hour + 1} a ${repetition.end_hour + 1}, o trecho tem ${repetition.hours} horas e índice de variação ${number(repetition.variation_index)}. Para a regra forte, falta: ${strongMissing.join(" e ")}. Para a regra com queda, falta: ${withDropMissing.join(" e ")}.`;
   } else if (abruptDrop) {
     classification = "inconclusive";
     reason = `Após a hora ${abruptDrop.after_hour + 1}, a média caiu ${percent(abruptDrop.drop)}, de ${number(abruptDrop.reference)} para ${number(abruptDrop.following_mean)} views. Uma queda isolada não basta para apontar suspeita.`;

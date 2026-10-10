@@ -36,14 +36,20 @@ describe("classificação de views", () => {
   });
 
   it.each([
-    [12000, ...Array(23).fill(100)],
-    [...Array(12).fill(0), 12000, ...Array(11).fill(100)],
-    [...Array(22).fill(100), 12000, 100],
-  ])("prefere não acusar um pico sem referência completa: %j", (...views) => {
+    { name: "sem histórico", views: [12000, ...Array(23).fill(100)],
+      details: ["o histórico anterior contém 0 das 5 horas necessárias"] },
+    { name: "mediana zero", views: [...Array(12).fill(0), 12000, ...Array(11).fill(100)],
+      details: ["a mediana das 5 horas anteriores é zero", "não é possível calcular a razão"] },
+    { name: "sem horas seguintes suficientes", views: [...Array(22).fill(100), 12000, 100],
+      details: ["o contexto posterior contém 1 das 3 horas necessárias"] },
+    { name: "mediana zero e contexto posterior incompleto", views: [...Array(22).fill(0), 12000, 100],
+      details: ["a mediana das 5 horas anteriores é zero", "o contexto posterior contém 1 das 3 horas necessárias"] },
+  ])("explica o contexto que falta no pico: $name", ({ views, details }) => {
     const result = classify(views);
     expect(result.classification).toBe("inconclusive");
     expect(result.signals.peak.missing_context).toBe(true);
-    expect(JSON.stringify(result)).not.toContain("NaN");
+    for (const detail of details) expect(result.reason).toContain(detail);
+    expect(result.reason).not.toContain("antes/depois ou");
   });
 
   it("detecta repetição desde a publicação, sem salto nem queda", () => {
@@ -53,6 +59,12 @@ describe("classificação de views", () => {
     expect(result.signals.repetition?.start_hour).toBe(0);
     expect(result.signals.repetition?.variation_index).toBe(0);
     expect(result.signals.repetition?.drop).toBe(0);
+    expect(result.reason).toContain("no máximo 0,1");
+    expect(result.reason).toContain("pelo menos 18 horas");
+    const adjusted = classify(Array(24).fill(500), { strong_hours: 20, strong_index: 0.08,
+      with_drop_hours: 8, with_drop_index: 0.3 });
+    expect(adjusted.reason).toContain("no máximo 0,08");
+    expect(adjusted.reason).toContain("pelo menos 20 horas");
   });
 
   it("ajusta a regularidade pelo volume em vez de acusar um viral por variar menos de 2%", () => {
@@ -68,7 +80,12 @@ describe("classificação de views", () => {
     const result = classify([...Array(8).fill(100), ...block, ...Array(8).fill(100)]);
     expect(result.classification).toBe("suspect");
     expect(result.signals.repetition).toMatchObject({ start_hour: 8, end_hour: 15, hours: 8, match: "with_drop", drop: 0.99 });
-    expect(classify([...Array(8).fill(3000), ...block, ...Array(8).fill(3000)]).classification).toBe("inconclusive");
+    expect(result.reason).toContain("no máximo 0,3");
+    expect(result.reason).toContain("pelo menos 8 horas");
+    expect(result.reason).toContain("99%, atingindo o mínimo de 90%");
+    const noDrop = classify([...Array(8).fill(3000), ...block, ...Array(8).fill(3000)]);
+    expect(noDrop.classification).toBe("inconclusive");
+    expect(noDrop.reason).toContain("queda mínima de 90% (a queda medida foi de 70,009%)");
   });
 
   it("não usa uma queda distante para completar uma repetição", () => {
@@ -81,7 +98,17 @@ describe("classificação de views", () => {
 
   it("deixa uma repetição curta inconclusiva mesmo com queda", () => {
     const views = [...Array(8).fill(100), ...Array(6).fill(5000), ...Array(10).fill(100)];
-    expect(classify(views)).toMatchObject({ classification: "inconclusive", signals: { repetition: { hours: 6, match: null } } });
+    const result = classify(views);
+    expect(result).toMatchObject({ classification: "inconclusive", signals: { repetition: { hours: 6, match: null } } });
+    expect(result.reason).toContain("Para a regra forte, falta: duração mínima de 18 horas.");
+    expect(result.reason).toContain("Para a regra com queda, falta: duração mínima de 8 horas.");
+  });
+
+  it("explica quando a repetição termina sem as horas necessárias para medir a queda", () => {
+    const result = classify([...Array(16).fill(100), ...repeat([9980, 10020], 4)]);
+    expect(result.classification).toBe("inconclusive");
+    expect(result.reason).toContain("duração mínima de 18 horas e índice de no máximo 0,1");
+    expect(result.reason).toContain("3 horas seguintes para medir a queda (há 0)");
   });
 
   it("uma queda isolada pode ser falha de coleta e não basta para suspeitar", () => {
