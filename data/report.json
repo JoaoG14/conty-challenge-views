@@ -1,0 +1,150 @@
+{
+  "seed": 20261011,
+  "total": 366,
+  "legitimate": 246,
+  "suspicious": 120,
+  "false_positives": 6,
+  "false_positive_rate": 0.024390243902439025,
+  "detected": 72,
+  "detection_rate": 0.6,
+  "suspicious_not_flagged": 48,
+  "inconclusive": 139,
+  "false_positive_ids": [
+    "organic_flash-1",
+    "organic_flash-2",
+    "organic_flash-3",
+    "organic_flash-4",
+    "organic_flash-5",
+    "organic_flash-6"
+  ],
+  "by_scenario": [
+    {
+      "scenario": "steady_small",
+      "label": "legitimate",
+      "total": 24,
+      "suspect": 0,
+      "inconclusive": 0,
+      "not_suspect": 24
+    },
+    {
+      "scenario": "steady_viral",
+      "label": "legitimate",
+      "total": 24,
+      "suspect": 0,
+      "inconclusive": 0,
+      "not_suspect": 24
+    },
+    {
+      "scenario": "organic_wave",
+      "label": "legitimate",
+      "total": 24,
+      "suspect": 0,
+      "inconclusive": 0,
+      "not_suspect": 24
+    },
+    {
+      "scenario": "organic_launch",
+      "label": "legitimate",
+      "total": 24,
+      "suspect": 0,
+      "inconclusive": 0,
+      "not_suspect": 24
+    },
+    {
+      "scenario": "organic_flash",
+      "label": "legitimate",
+      "total": 6,
+      "suspect": 6,
+      "inconclusive": 0,
+      "not_suspect": 0
+    },
+    {
+      "scenario": "smoothed_counts",
+      "label": "legitimate",
+      "total": 24,
+      "suspect": 0,
+      "inconclusive": 19,
+      "not_suspect": 5
+    },
+    {
+      "scenario": "short_plateau",
+      "label": "legitimate",
+      "total": 24,
+      "suspect": 0,
+      "inconclusive": 24,
+      "not_suspect": 0
+    },
+    {
+      "scenario": "collection_gap",
+      "label": "legitimate",
+      "total": 24,
+      "suspect": 0,
+      "inconclusive": 24,
+      "not_suspect": 0
+    },
+    {
+      "scenario": "daily_cycle",
+      "label": "legitimate",
+      "total": 24,
+      "suspect": 0,
+      "inconclusive": 0,
+      "not_suspect": 24
+    },
+    {
+      "scenario": "early_peak",
+      "label": "legitimate",
+      "total": 24,
+      "suspect": 0,
+      "inconclusive": 24,
+      "not_suspect": 0
+    },
+    {
+      "scenario": "low_activity",
+      "label": "legitimate",
+      "total": 24,
+      "suspect": 0,
+      "inconclusive": 24,
+      "not_suspect": 0
+    },
+    {
+      "scenario": "bought_peak",
+      "label": "suspicious",
+      "total": 24,
+      "suspect": 24,
+      "inconclusive": 0,
+      "not_suspect": 0
+    },
+    {
+      "scenario": "mechanical_launch",
+      "label": "suspicious",
+      "total": 24,
+      "suspect": 24,
+      "inconclusive": 0,
+      "not_suspect": 0
+    },
+    {
+      "scenario": "mechanical_block",
+      "label": "suspicious",
+      "total": 24,
+      "suspect": 24,
+      "inconclusive": 0,
+      "not_suspect": 0
+    },
+    {
+      "scenario": "short_mechanical_block",
+      "label": "suspicious",
+      "total": 24,
+      "suspect": 0,
+      "inconclusive": 24,
+      "not_suspect": 0
+    },
+    {
+      "scenario": "disguised_bots",
+      "label": "suspicious",
+      "total": 24,
+      "suspect": 0,
+      "inconclusive": 0,
+      "not_suspect": 24
+    }
+  ]
+}
