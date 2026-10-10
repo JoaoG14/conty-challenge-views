@@ -22,8 +22,19 @@ function findPeak(views: number[], total: number) {
   const share = total > 0 ? maximum / total : 0;
   const after = followingDrop(views, hour, maximum);
   const candidate = maximum > RULES.peak_minimum && share >= RULES.peak_share;
+  const previousViews = hour > 0 ? views[hour - 1] : null;
+  const followingViews = views.slice(hour + 1, hour + 4);
+  const previousRatio = baseline !== null && baseline > 0 && previousViews !== null ? previousViews / baseline : null;
+  const followingRatio = baseline !== null && baseline > 0 && followingViews.length > 0 ? followingViews[0] / baseline : null;
+  const decliningTail = followingViews.length === 3
+    ? followingViews[0] > followingViews[1] && followingViews[1] > followingViews[2] : null;
+  const organicContext = previousRatio !== null && previousRatio >= RULES.organic_context_ratio
+    && followingRatio !== null && followingRatio >= RULES.organic_context_ratio && decliningTail === true;
   return {
     hour, views: maximum, baseline, ratio, share, ...after,
+    previous_views: previousViews, previous_ratio: previousRatio,
+    following_views: followingViews, following_ratio: followingRatio,
+    declining_tail: decliningTail, organic_context: organicContext,
     detected: candidate && ratio !== null && ratio >= RULES.peak_ratio
       && after.drop !== null && after.drop >= RULES.drop,
     missing_context: candidate && (ratio === null || (ratio >= RULES.peak_ratio && after.drop === null)),
@@ -93,7 +104,7 @@ export function classify(views: number[], repetitionRules: RepetitionRules = REP
   if (views.length < RULES.minimum_hours || total < RULES.minimum_total) {
     classification = "inconclusive";
     reason = `São ${views.length} horas e ${number(total)} views. A análise exige pelo menos 24 horas e 1.000 views.`;
-  } else if (peak.detected) {
+  } else if (peak.detected && !peak.organic_context) {
     classification = "suspect";
     reason = `Na hora ${peak.hour + 1}, o pico teve ${number(peak.views)} views: ${number(peak.ratio!)} vezes a mediana anterior, ${percent(peak.share)} do total e queda de ${percent(peak.drop!)} na média das 3 horas seguintes.`;
   } else if (repetition?.match) {
@@ -102,6 +113,9 @@ export function classify(views: number[], repetitionRules: RepetitionRules = REP
       ? `O índice é no máximo ${number(repetitionRules.strong_index)} e a duração é de pelo menos ${repetitionRules.strong_hours} horas, atendendo à regra forte. Essa regra não exige salto ou queda.`
       : `O índice é no máximo ${number(repetitionRules.with_drop_index)} e a duração é de pelo menos ${repetitionRules.with_drop_hours} horas. A queda nas 3 horas seguintes foi de ${percent(repetition.drop!)}, atingindo o mínimo de ${percent(RULES.drop)}.`;
     reason = `Das horas ${repetition.start_hour + 1} a ${repetition.end_hour + 1}, foram ${repetition.hours} horas com média de ${number(repetition.mean)} views, índice de variação ${number(repetition.variation_index)} e ${percent(repetition.share)} do total. ${detail}`;
+  } else if (peak.detected && peak.organic_context) {
+    classification = "inconclusive";
+    reason = `Na hora ${peak.hour + 1}, o pico teve ${number(peak.views)} views. A hora anterior teve ${number(peak.previous_views!)} views (${number(peak.previous_ratio!)} vezes a mediana anterior). Nas 3 horas seguintes, foram ${peak.following_views.map(number).join(", ")} views, em queda progressiva; a primeira ainda teve ${number(peak.following_ratio!)} vezes a mediana anterior. Esse comportamento é compatível com um viral orgânico, então o pico sozinho não basta para apontar suspeita.`;
   } else if (peak.missing_context) {
     classification = "inconclusive";
     const missing: string[] = [];

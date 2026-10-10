@@ -22,6 +22,13 @@ describe("avaliação reproduzível", () => {
     expect(documented![1].trim()).toBe(evaluationSummary(report));
   });
 
+  it("deixa os virais curtos inconclusivos e preserva os picos comprados detectados", () => {
+    expect(report.by_scenario.find((row) => row.scenario === "organic_flash"))
+      .toMatchObject({ total: 48, suspect: 0, inconclusive: 48 });
+    expect(report.by_scenario.find((row) => row.scenario === "bought_peak"))
+      .toMatchObject({ total: 48, suspect: 40 });
+  });
+
   it("expõe falsos positivos e casos suspeitos que escapam, sem chamar inconclusivo de acerto", () => {
     const regular = Array(24).fill(500);
     const varied = Array.from({ length: 24 }, (_, hour) => [300, 500, 700][hour % 3]);

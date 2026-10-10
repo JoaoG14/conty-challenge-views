@@ -4,6 +4,7 @@ export const RULES = {
   peak_minimum: 5000,
   peak_ratio: 10,
   peak_share: 0.5,
+  organic_context_ratio: 2,
   drop: 0.9,
   repetition_mean: 200,
   repetition_share: 0.3,

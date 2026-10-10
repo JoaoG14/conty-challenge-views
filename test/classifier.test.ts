@@ -21,6 +21,38 @@ describe("classificação de views", () => {
     });
   });
 
+  it("prefere não acusar um viral curto com crescimento e cauda mesmo atendendo à regra de pico", () => {
+    const views = [...Array(11).fill(100), 200, 12000, 200, 150, 100, ...Array(8).fill(100)];
+    const result = classify(views);
+    expect(result).toMatchObject({
+      classification: "inconclusive",
+      signals: { peak: { detected: true, organic_context: true, baseline: 100,
+        previous_views: 200, previous_ratio: 2, following_views: [200, 150, 100],
+        following_ratio: 2, declining_tail: true } },
+      thresholds: { organic_context_ratio: 2 },
+    });
+    expect(result.reason).toContain("compatível com um viral orgânico");
+    expect(result.reason).toContain("200, 150, 100 views, em queda progressiva");
+  });
+
+  it("só protege o pico com crescimento antes e depois e uma cauda estritamente decrescente", () => {
+    for (const [previous, ...tail] of [[199, 200, 150, 100], [200, 199, 150, 100],
+      [200, 200, 200, 100], [200, 200, 100, 150]]) {
+      const views = [...Array(11).fill(100), previous, 12000, ...tail, ...Array(8).fill(100)];
+      expect(classify(views)).toMatchObject({ classification: "suspect",
+        signals: { peak: { detected: true, organic_context: false } } });
+    }
+  });
+
+  it("mantém a suspeita por repetição independente mesmo com contexto orgânico no pico", () => {
+    const views = [...Array(5).fill(100), 200, 50000, 200, 150, 100, ...Array(18).fill(2000)];
+    const result = classify(views);
+    expect(result).toMatchObject({ classification: "suspect", signals: {
+      peak: { detected: true, organic_context: true }, repetition: { match: "strong" },
+    } });
+    expect(result.reason).toContain("atendendo à regra forte");
+  });
+
   it("exige mais de 5.000 views, mesmo com os outros critérios atendidos", () => {
     const views = [...Array(5).fill(500), 5000, ...Array(18).fill(10)];
     expect(classify(views).signals.peak.detected).toBe(false);
@@ -48,6 +80,7 @@ describe("classificação de views", () => {
     const result = classify(views);
     expect(result.classification).toBe("inconclusive");
     expect(result.signals.peak.missing_context).toBe(true);
+    expect(result.signals.peak.organic_context).toBe(false);
     for (const detail of details) expect(result.reason).toContain(detail);
     expect(result.reason).not.toContain("antes/depois ou");
   });
