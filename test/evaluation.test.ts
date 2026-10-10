@@ -23,12 +23,38 @@ describe("avaliação reproduzível", () => {
   });
 
   it("expõe falsos positivos e casos suspeitos que escapam, sem chamar inconclusivo de acerto", () => {
-    expect(report.false_positive_rate).toBe(report.false_positives / report.legitimate);
-    expect(report.detection_rate).toBe(report.detected / report.suspicious);
-    expect(report.false_positive_ids).toContain("organic_flash-1");
-    expect(report.by_scenario.find((item) => item.scenario === "disguised_bots"))
-      .toMatchObject({ suspect: 0, not_suspect: 24 });
-    expect(report.by_scenario.find((item) => item.scenario === "early_peak"))
-      .toMatchObject({ suspect: 0, inconclusive: 24 });
+    const regular = Array(24).fill(500);
+    const varied = Array.from({ length: 24 }, (_, hour) => [300, 500, 700][hour % 3]);
+    const measured = evaluate([
+      { id: "rounded", scenario: "legitimate", label: "legitimate", description: "", views: regular },
+      { id: "natural", scenario: "legitimate", label: "legitimate", description: "", views: varied },
+      { id: "empty", scenario: "legitimate", label: "legitimate", description: "", views: Array(24).fill(0) },
+      { id: "mechanical", scenario: "bots", label: "suspicious", description: "", views: regular },
+      { id: "disguised", scenario: "bots", label: "suspicious", description: "", views: varied },
+    ]);
+    expect(measured).toMatchObject({ false_positive_rate: 1 / 3, detection_rate: 1 / 2,
+      inconclusive: 1, suspicious_not_flagged: 1, false_positive_ids: ["rounded"] });
+    expect(measured.by_scenario).toEqual([
+      { scenario: "legitimate", label: "legitimate", total: 3, suspect: 1, not_suspect: 1,
+        inconclusive: 1, false_positive_rate: 1 / 3, detection_rate: null, inconclusive_rate: 1 / 3 },
+      { scenario: "bots", label: "suspicious", total: 2, suspect: 1, not_suspect: 1,
+        inconclusive: 0, false_positive_rate: null, detection_rate: 1 / 2, inconclusive_rate: 0 },
+    ]);
+  });
+
+  it("equilibra os cenários e cruza duração, ruído e volume nos blocos mecânicos", () => {
+    expect(report.by_scenario).toHaveLength(16);
+    expect(report.by_scenario.every((row) => row.total === 48)).toBe(true);
+    for (const scenario of ["mechanical_launch", "mechanical_block", "short_mechanical_block"]) {
+      const rows = samples.filter((sample) => sample.scenario === scenario);
+      const durations = scenario === "short_mechanical_block" ? [4, 5, 6, 7, 8, 9] : [7, 8, 9, 17, 18, 19];
+      for (const duration of durations) {
+        for (const noise of [0.09, 0.11, 0.29, 0.31]) {
+          const pair = rows.filter(({ parameters: p }) => p?.duration_hours === duration && p.noise_scale === noise);
+          expect(pair).toHaveLength(2);
+          expect(pair.map(({ parameters: p }) => p!.mean_views < 10000)).toEqual([true, false]);
+        }
+      }
+    }
   });
 });

@@ -7,6 +7,7 @@ export type Sample = {
   label: "legitimate" | "suspicious";
   description: string;
   views: number[];
+  parameters?: Record<string, number>;
 };
 
 export function generateDataset(seed: number): Sample[] {
@@ -38,10 +39,24 @@ export function generateDataset(seed: number): Sample[] {
   }
 
   const samples: Sample[] = [];
-  function add(scenario: string, label: Sample["label"], description: string, build: () => number[], amount = 24) {
-    for (let i = 0; i < amount; i++) {
-      samples.push({ id: `${scenario}-${i + 1}`, scenario, label, description, views: build() });
+  function add(scenario: string, label: Sample["label"], description: string,
+    build: (index: number) => number[] | Pick<Sample, "views" | "parameters">) {
+    for (let i = 0; i < 48; i++) {
+      const series = build(i);
+      samples.push({ id: `${scenario}-${i + 1}`, scenario, label, description,
+        ...(Array.isArray(series) ? { views: series } : series) });
     }
+  }
+
+  // Cada duração aparece com quatro ruídos e dois volumes. Não consulta as regras.
+  function mechanical(index: number, durations: number[], start: number, remainingRatio: number) {
+    const duration = durations[Math.floor(index / 8)];
+    const noise = [0.09, 0.11, 0.29, 0.31][Math.floor(index / 2) % 4];
+    const level = index % 2 === 0 ? between(300, 1000) : between(300000, 1000000);
+    const views = steady(48, level * remainingRatio);
+    const block = Array.from({ length: duration }, () => integer(level + Math.sqrt(level) * noise * normal()));
+    views.splice(start, duration, ...block);
+    return { views, parameters: { start_hour: start, duration_hours: duration, noise_scale: noise, mean_views: level, remaining_ratio: remainingRatio } };
   }
 
   add("steady_small", "legitimate", "Audiência pequena com chegadas independentes.", () => steady(48, between(200, 800)));
@@ -52,24 +67,31 @@ export function generateDataset(seed: number): Sample[] {
     const decay = between(5, 10);
     return Array.from({ length: 48 }, (_, hour) => count(80 + height * Math.exp(-hour / decay)));
   });
-  add("organic_flash", "legitimate", "Evento legítimo curto, com pico concentrado; pode ser indistinguível de um pico comprado.", () => {
-    const views = steady(48, between(50, 90));
-    const peak = integer(between(10000, 20000));
-    views[15] = peak;
-    views[14] = count(peak * between(0.03, 0.07));
-    views[16] = count(peak * between(0.04, 0.1));
-    views[17] = count(peak * between(0.01, 0.04));
-    return views;
-  }, 6);
-  add("smoothed_counts", "legitimate", "Relatório suaviza contagens com média móvel de quatro horas e arredonda os valores.", () => {
-    const raw = steady(51, between(500000, 1500000));
-    return Array.from({ length: 48 }, (_, hour) => integer(raw.slice(hour, hour + 4).reduce((a, b) => a + b, 0) / 4));
+  add("organic_flash", "legitimate", "Evento legítimo curto com pico e cauda de intensidades variadas.", () => {
+    const views = steady(48, between(50, 250));
+    const peak = integer(between(6000, 30000));
+    const hour = Math.floor(between(8, 35));
+    const tail = between(0.02, 0.5);
+    views[hour] = peak;
+    views[hour - 1] = count(peak * between(0.03, 0.4));
+    views[hour + 1] = count(peak * tail);
+    views[hour + 2] = count(peak * tail * 0.5);
+    views[hour + 3] = count(peak * tail * 0.25);
+    return { views, parameters: { peak_hour: hour, peak_views: peak, tail_ratio: tail } };
   });
-  add("short_plateau", "legitimate", "Contagem arredondada mantém seis horas iguais, sem queda de 90%.", () => {
-    const level = integer(between(200, 500));
-    const views = steady(24, level * 0.3);
-    views.splice(8, 6, ...Array(6).fill(level));
-    return views;
+  add("smoothed_counts", "legitimate", "Relatório suaviza contagens com médias móveis de diferentes durações.", (index) => {
+    const window = [2, 4, 8, 16][index % 4];
+    const raw = steady(48 + window - 1, between(500000, 1500000));
+    const views = Array.from({ length: 48 }, (_, hour) => integer(raw.slice(hour, hour + window).reduce((a, b) => a + b, 0) / window));
+    return { views, parameters: { smoothing_hours: window } };
+  });
+  add("rounded_plateau", "legitimate", "Relatório arredonda uma audiência legítima para centenas durante um patamar.", (index) => {
+    const duration = [7, 8, 9, 17, 18, 19][Math.floor(index / 8)];
+    const level = integer(between(2, 8)) * 100;
+    const views = steady(48, level * 0.3);
+    const block = steady(duration, level).map((value) => Math.round(value / 100) * 100);
+    views.splice(12, duration, ...block);
+    return { views, parameters: { start_hour: 12, duration_hours: duration, mean_views: level, rounding_step: 100 } };
   });
   add("collection_gap", "legitimate", "Falha de coleta registrada como zeros, sem compra de views.", () => [
     ...steady(24, between(5000, 10000)), ...Array(24).fill(0),
@@ -86,26 +108,16 @@ export function generateDataset(seed: number): Sample[] {
   add("low_activity", "legitimate", "Poucas views para concluir algo sobre o comportamento.", () => steady(24, between(5, 20)));
 
   add("bought_peak", "suspicious", "Compra simulada acrescenta um lote de views numa hora.", () => {
-    const views = steady(48, between(50, 180));
-    views[18] += integer(between(8000, 14000));
+    const views = steady(48, between(50, 250));
+    views[Math.floor(between(5, 44))] += integer(between(3000, 18000));
     return views;
   });
-  add("mechanical_launch", "suspicious", "Emissão mecânica começa na publicação e continua até o fim da série.", () => {
-    const level = between(300, 2000);
-    return Array.from({ length: 48 }, () => integer(level + between(-2, 2)));
-  });
-  add("mechanical_block", "suspicious", "Emissão mecânica mantém um patamar durante dezesseis horas.", () => {
-    const views = steady(48, between(50, 100));
-    const level = between(3000, 10000);
-    views.splice(12, 16, ...Array.from({ length: 16 }, () => integer(level + Math.sqrt(level) * 0.1 * normal())));
-    return views;
-  });
-  add("short_mechanical_block", "suspicious", "Emissão mecânica com ruído termina após seis horas.", () => {
-    const views = steady(48, between(50, 100));
-    const level = between(3000, 15000);
-    views.splice(12, 6, ...Array.from({ length: 6 }, () => integer(level + Math.sqrt(level) * 0.45 * normal())));
-    return views;
-  });
+  add("mechanical_launch", "suspicious", "Emissão mecânica começa na publicação; depois permanece audiência residual, sem queda de 90%.",
+    (index) => mechanical(index, [7, 8, 9, 17, 18, 19], 0, 0.35));
+  add("mechanical_block", "suspicious", "Emissão mecânica com duração e ruído variados, seguida de queda.",
+    (index) => mechanical(index, [7, 8, 9, 17, 18, 19], 12, 0.03));
+  add("short_mechanical_block", "suspicious", "Emissão mecânica curta, com duração e ruído variados, seguida de queda.",
+    (index) => mechanical(index, [4, 5, 6, 7, 8, 9], 12, 0.03));
   add("disguised_bots", "suspicious", "Bots simulam a mesma distribuição de uma onda orgânica; só as contagens não revelam a origem.", wave);
   return samples;
 }

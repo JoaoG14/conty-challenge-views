@@ -9,5 +9,4 @@ mkdirSync(dataDirectory, { recursive: true });
 writeFileSync(new URL("dataset.jsonl", dataDirectory), samples.map((sample) => JSON.stringify(sample)).join("\n") + "\n");
 writeFileSync(new URL("report.json", dataDirectory), JSON.stringify(report, null, 2) + "\n");
 console.log(evaluationSummary(report));
-console.table(report.by_scenario);
 console.log(`Seed ${EVALUATION_SEED}. Dataset e relatório salvos em data/. O README não é alterado pelo comando.`);
