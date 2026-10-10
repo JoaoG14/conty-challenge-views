@@ -1,25 +1,6 @@
 import { followingDrop, mean, median, sum, variation } from "./stats.ts";
-
-export const RULES = {
-  minimum_hours: 24,
-  minimum_total: 1000,
-  peak_minimum: 5000,
-  peak_ratio: 10,
-  peak_share: 0.5,
-  drop: 0.9,
-  repetition_mean: 200,
-  repetition_share: 0.3,
-  observation_hours: 6,
-};
-
-export const REPETITION = {
-  strong_hours: 18,
-  strong_index: 0.1,
-  with_drop_hours: 8,
-  with_drop_index: 0.3,
-};
-
-export type RepetitionRules = typeof REPETITION;
+import { RULES, REPETITION } from "./rules.ts";
+import type { RepetitionRules } from "./rules.ts";
 export type Classification = "suspect" | "inconclusive" | "not_suspect";
 
 export function validateViews(value: unknown): string | null {

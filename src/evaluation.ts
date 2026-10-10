@@ -1,5 +1,6 @@
-import { classify, REPETITION } from "./classifier.ts";
-import type { RepetitionRules } from "./classifier.ts";
+import { classify } from "./classifier.ts";
+import { REPETITION } from "./rules.ts";
+import type { RepetitionRules } from "./rules.ts";
 import type { Sample } from "./dataset.ts";
 
 export function evaluate(samples: Sample[], rules: RepetitionRules = REPETITION) {
